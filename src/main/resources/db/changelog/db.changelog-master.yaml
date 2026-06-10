@@ -1,0 +1,31 @@
+databaseChangeLog:
+ - changeSet:
+      id: 1
+      author: "Kamil Rysnik"
+      changes:
+        - createTable:
+            tableName: "load_entry"
+            columns:
+              - column:
+                  name: "load_id"
+                  type: "INT"
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: "customer_id"
+                  type: "INT"
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: "amount_cad"
+                  type: "DECIMAL(10, 2)"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: "time"
+                  type: "TIMESTAMP(9)"
+                  constraints:
+                    nullable: false
+  
