@@ -6,6 +6,7 @@ import java.time.ZonedDateTime;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import ca.venn.hometask.api.Amount;
 import ca.venn.hometask.api.LoadOrder;
 import ca.venn.hometask.api.LoadResult;
 import ca.venn.hometask.api.VelocityLimiter;
@@ -13,8 +14,10 @@ import ca.venn.hometask.model.LoadEntry;
 import ca.venn.hometask.model.LoadEntryAggregate;
 import ca.venn.hometask.model.LoadEntryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RequiredArgsConstructor
+@Slf4j
 public class VelocityLimiterImpl implements VelocityLimiter {
     private final LoadEntryRepository loadEntryRepository;
     private static final int DAILY_LOAD_COUNT_LIMIT = 3;
@@ -24,16 +27,32 @@ public class VelocityLimiterImpl implements VelocityLimiter {
     @Transactional(isolation = Isolation.REPEATABLE_READ)//Isolation level is only necessary if we allow concurrent load attempts
     @Override
     public LoadResult attemptLoad(LoadOrder loadOrder) {
+        // Call conversion early to trigger exchange rate validation before any database calls
+        BigDecimal amountInCAD = convertToCAD(loadOrder.loadAmount());
         validateExistence(loadOrder);
-        validateLimits(loadOrder);
+        boolean validationResult = validateLimits(loadOrder, amountInCAD);
         
-        loadEntryRepository.save(new LoadEntry(
-                new LoadEntry.LoadEntryId(loadOrder.id(), loadOrder.customerId()),
-                loadOrder.loadAmount().value(),
-                loadOrder.time()
-        ));
+        if (validationResult) {
+            loadEntryRepository.save(new LoadEntry(
+                    new LoadEntry.LoadEntryId(loadOrder.id(), loadOrder.customerId()),
+                    amountInCAD,
+                    loadOrder.time()
+            ));
+        } else {
+            // Log or save failed requests for audit purposes if required
+        }
 
-        return new LoadResult(loadOrder.id(), loadOrder.customerId(), true);
+        return new LoadResult(loadOrder.id(), loadOrder.customerId(), validationResult);
+    }
+
+    private BigDecimal convertToCAD(Amount amount) {
+        switch (amount.currency().getCurrencyCode()) {
+            case "CAD":
+                return amount.value();
+            default:
+                log.error("No conversion defined for: {}", amount.currency().getCurrencyCode());
+                throw new UnsupportedOperationException("Unsupported currency: " + amount.currency().getCurrencyCode());
+        }
     }
 
     private void validateExistence(LoadOrder loadOrder) {
@@ -42,27 +61,32 @@ public class VelocityLimiterImpl implements VelocityLimiter {
         }
     }
     
-    private void validateLimits(LoadOrder loadOrder) {
-        validateDailyLimits(loadOrder);
-        validateWeeklyLimits(loadOrder);
+    private boolean validateLimits(LoadOrder loadOrder, BigDecimal amountInCAD) {
+        return validateDailyLimits(loadOrder, amountInCAD) && validateWeeklyLimits(loadOrder, amountInCAD);
     }
 
-    private void validateDailyLimits(LoadOrder loadOrder) {
+    private boolean validateDailyLimits(LoadOrder loadOrder, BigDecimal amountInCAD) {
         ZonedDateTime startOfDay = loadOrder.time().toLocalDate().atStartOfDay(loadOrder.time().getZone());
         LoadEntryAggregate aggregate = loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(loadOrder.customerId(), startOfDay, startOfDay.plusDays(1));
         if (aggregate.loadCount() >= DAILY_LOAD_COUNT_LIMIT) {
-            throw new IllegalStateException("Customer %d has already reached the maximum number of loads for the day".formatted(loadOrder.customerId()));
+            log.debug("Customer {} exceeded daily limit of load count. Limit {}, processed loads over the day {}", loadOrder.customerId(), DAILY_LOAD_COUNT_LIMIT, aggregate.loadCount());
+            return false;
         }
-        if (aggregate.totalAmount().add(loadOrder.loadAmount().value()).compareTo(DAILY_LOAD_LIMIT) > 0) {
-            throw new IllegalStateException("Customer %d has already reached the maximum total load amount for the day".formatted(loadOrder.customerId()));
+
+        if (aggregate.totalAmount().add(amountInCAD).compareTo(DAILY_LOAD_LIMIT) > 0) {
+            log.debug("Customer {} exceeded daily limit of loads. Limit {}, loads over the day {}, request {}{} in CAD: {}", loadOrder.customerId(), DAILY_LOAD_LIMIT, aggregate.totalAmount(), loadOrder.loadAmount().value(), loadOrder.loadAmount().currency().getCurrencyCode(), amountInCAD);
+            return false;
         }
+        return true;
     }
 
-    private void validateWeeklyLimits(LoadOrder loadOrder) {
+    private boolean validateWeeklyLimits(LoadOrder loadOrder, BigDecimal amountInCAD) {
         ZonedDateTime startOfWeek = loadOrder.time().toLocalDate().with(java.time.DayOfWeek.MONDAY).atStartOfDay(loadOrder.time().getZone());
         LoadEntryAggregate aggregate = loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(loadOrder.customerId(), startOfWeek, startOfWeek.plusWeeks(1));
-        if (aggregate.totalAmount().add(loadOrder.loadAmount().value()).compareTo(WEEKLY_LOAD_LIMIT) > 0) {
-            throw new IllegalStateException("Customer %d has already reached the maximum total load amount for the week".formatted(loadOrder.customerId()));
+        if (aggregate.totalAmount().add(amountInCAD).compareTo(WEEKLY_LOAD_LIMIT) > 0) {
+            log.debug("Customer {} exceeded weekly limit of loads. Limit {}, loads over the week {}, request {}{} in CAD: {}", loadOrder.customerId(), WEEKLY_LOAD_LIMIT, aggregate.totalAmount(), loadOrder.loadAmount().value(), loadOrder.loadAmount().currency().getCurrencyCode(), amountInCAD);
+            return false;
         }
+        return true;
     }
 }
