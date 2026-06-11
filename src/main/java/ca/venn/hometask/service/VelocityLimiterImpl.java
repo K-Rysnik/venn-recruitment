@@ -26,7 +26,7 @@ public class VelocityLimiterImpl implements VelocityLimiter {
     private static final BigDecimal DAILY_LOAD_LIMIT = new BigDecimal("5000");
     private static final BigDecimal WEEKLY_LOAD_LIMIT = new BigDecimal("20000");
 
-    @Transactional(isolation = Isolation.REPEATABLE_READ)//Isolation level is only necessary if we allow concurrent load attempts
+    @Transactional(isolation = Isolation.SERIALIZABLE)// To avoid phantom reads. Isolation level is only necessary if we allow concurrent load attempts
     @Override
     public LoadResult attemptLoad(LoadOrder loadOrder) {
         // Call conversion early to trigger exchange rate validation before any database calls
