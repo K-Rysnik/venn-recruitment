@@ -1,24 +1,23 @@
 package ca.venn.hometask.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Currency;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.BDDMockito;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import ca.venn.hometask.api.Amount;
@@ -88,14 +87,17 @@ class VelocityLimiterImplTest {
         BDDMockito.given(loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(eq(CUSTOMER_ID), any(ZonedDateTime.class), any(ZonedDateTime.class)))
                 .willReturn(aggregate);
 
+        ArgumentCaptor<LoadEntry> loadEntryCaptor = ArgumentCaptor.forClass(LoadEntry.class);
+
         // when
         LoadResult result = velocityLimiter.attemptLoad(request);
-        
+
         // then
         assertEquals(LOAD_ID, result.id());
         assertEquals(CUSTOMER_ID, result.customerId());
         assertEquals(false, result.accepted());
-        verify(loadEntryRepository, Mockito.never()).save(any(LoadEntry.class));
+        verify(loadEntryRepository).save(loadEntryCaptor.capture());
+        assertFalse(loadEntryCaptor.getValue().isAccepted());
     }
 
     @Test
@@ -108,6 +110,8 @@ class VelocityLimiterImplTest {
         BDDMockito.given(loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(eq(CUSTOMER_ID), any(ZonedDateTime.class), any(ZonedDateTime.class)))
                 .willReturn(aggregate);
 
+        ArgumentCaptor<LoadEntry> loadEntryCaptor = ArgumentCaptor.forClass(LoadEntry.class);
+
         // when
         LoadResult result = velocityLimiter.attemptLoad(request);
 
@@ -115,7 +119,8 @@ class VelocityLimiterImplTest {
         assertEquals(LOAD_ID, result.id());
         assertEquals(CUSTOMER_ID, result.customerId());
         assertEquals(false, result.accepted());
-        verify(loadEntryRepository, Mockito.never()).save(any(LoadEntry.class));
+        verify(loadEntryRepository).save(loadEntryCaptor.capture());
+        assertFalse(loadEntryCaptor.getValue().isAccepted());
     }
 
     @Test
@@ -130,6 +135,8 @@ class VelocityLimiterImplTest {
                 .willReturn(dailyAggregate)
                 .willReturn(weeklyAggregate);
 
+        ArgumentCaptor<LoadEntry> loadEntryCaptor = ArgumentCaptor.forClass(LoadEntry.class);
+
         // when
         LoadResult result = velocityLimiter.attemptLoad(request);
 
@@ -137,7 +144,8 @@ class VelocityLimiterImplTest {
         assertEquals(LOAD_ID, result.id());
         assertEquals(CUSTOMER_ID, result.customerId());
         assertEquals(false, result.accepted());
-        verify(loadEntryRepository, Mockito.never()).save(any(LoadEntry.class));
+        verify(loadEntryRepository).save(loadEntryCaptor.capture());
+        assertFalse(loadEntryCaptor.getValue().isAccepted());
     }
 
     @Test

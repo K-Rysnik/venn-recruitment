@@ -28,4 +28,9 @@ databaseChangeLog:
                   type: "TIMESTAMP(9)"
                   constraints:
                     nullable: false
+              - column:
+                  name: "accepted"
+                  type: "BOOLEAN"
+                  constraints:
+                    nullable: false
   

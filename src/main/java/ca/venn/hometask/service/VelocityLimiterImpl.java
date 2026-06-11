@@ -3,6 +3,7 @@ package ca.venn.hometask.service;
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ import ca.venn.hometask.model.LoadEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+@Component
 @RequiredArgsConstructor
 @Slf4j
 public class VelocityLimiterImpl implements VelocityLimiter {
@@ -32,15 +34,12 @@ public class VelocityLimiterImpl implements VelocityLimiter {
         validateExistence(loadOrder);
         boolean validationResult = validateLimits(loadOrder, amountInCAD);
         
-        if (validationResult) {
-            loadEntryRepository.save(new LoadEntry(
-                    new LoadEntry.LoadEntryId(loadOrder.id(), loadOrder.customerId()),
-                    amountInCAD,
-                    loadOrder.time()
-            ));
-        } else {
-            // Log or save failed requests for audit purposes if required
-        }
+        loadEntryRepository.save(new LoadEntry(
+                new LoadEntry.LoadEntryId(loadOrder.id(), loadOrder.customerId()),
+                amountInCAD,
+                loadOrder.time(),
+                validationResult
+        ));
 
         return new LoadResult(loadOrder.id(), loadOrder.customerId(), validationResult);
     }

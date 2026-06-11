@@ -151,4 +151,21 @@ public class LoadEntryRepositoryTest {
         assertEquals(BigDecimal.ZERO, result.totalAmount());
         assertEquals(0, result.loadCount());
     }
+
+    @Test
+    void shouldIgnoreEntriesNotAcceptedInAggregate() {
+        // given
+        ZonedDateTime entryTime = ZonedDateTime.now();
+        repository.saveAndFlush(new LoadEntry(new LoadEntryId(1, CUSTOMER_ID_1), AMOUNT_100, entryTime));
+        repository.saveAndFlush(new LoadEntry(new LoadEntryId(2, CUSTOMER_ID_1), AMOUNT_100, entryTime, false));
+
+        // when
+        LoadEntryAggregate result = repository.getEntryAggregateByCustomerIdAndTimeBetween(
+                CUSTOMER_ID_1, entryTime.minusHours(1), entryTime.plusHours(1));
+
+        // then
+        assertNotNull(result);
+        assertEquals(AMOUNT_100, result.totalAmount());
+        assertEquals(1, result.loadCount());
+    }
 }

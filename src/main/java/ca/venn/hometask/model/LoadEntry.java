@@ -24,10 +24,20 @@ public class LoadEntry {
 
     ZonedDateTime time;
 
+    boolean accepted;
+
+    public LoadEntry(LoadEntryId id, BigDecimal amountCAD, ZonedDateTime time, boolean accepted) {
+        this.id = id;
+        this.amountCAD = amountCAD;
+        this.time = time;
+        this.accepted = accepted;
+    }
+
     public LoadEntry(LoadEntryId id, BigDecimal amountCAD, ZonedDateTime time) {
         this.id = id;
         this.amountCAD = amountCAD;
         this.time = time;
+        this.accepted = true;
     }
 
     @Embeddable

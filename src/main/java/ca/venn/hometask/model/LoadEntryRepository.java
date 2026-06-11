@@ -11,6 +11,6 @@ public interface LoadEntryRepository extends JpaRepository<LoadEntry, LoadEntryI
 
     @Query("SELECT new ca.venn.hometask.model.LoadEntryAggregate(COALESCE(SUM(le.amountCAD), 0) AS totalAmount, COUNT(le) AS loadCount) " +
             "FROM LoadEntry le " +
-            "WHERE le.id.customerId = :customerId AND le.time >= :startDate AND le.time < :endDate")
+            "WHERE le.id.customerId = :customerId AND le.accepted = true AND le.time >= :startDate AND le.time < :endDate")
     LoadEntryAggregate getEntryAggregateByCustomerIdAndTimeBetween(Integer customerId, ZonedDateTime startDate, ZonedDateTime endDate);
 }
