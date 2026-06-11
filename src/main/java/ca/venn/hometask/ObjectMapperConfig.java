@@ -2,6 +2,7 @@ package ca.venn.hometask;
 
 import java.math.BigDecimal;
 import java.util.Currency;
+import java.util.regex.Pattern;
 
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +18,8 @@ import tools.jackson.databind.module.SimpleModule;
 
 @Configuration
 public class ObjectMapperConfig {
+private static final Pattern AMOUNT_PATTERN_WITH_DECIMAL_DOT = Pattern.compile("^\\d+\\.\\d{2}$");
+
     @Bean
     public JsonMapperBuilderCustomizer jsonMapperBuilderCustomizer() {
         return builder -> {
@@ -29,7 +32,7 @@ public class ObjectMapperConfig {
                 public Amount deserialize(JsonParser p, DeserializationContext ctxt) {
                     // Implement your custom parsing logic here
                     String value = p.getValueAsString();
-                    if(value.startsWith("$")) {
+                    if(value.startsWith("$") && AMOUNT_PATTERN_WITH_DECIMAL_DOT.matcher(value.substring(1)).matches()) {
                         return new Amount(Currency.getInstance("CAD"), new BigDecimal(value.substring(1)));
                     }
                     throw new UnsupportedOperationException("Unsupported amount format: " + value);
