@@ -180,4 +180,70 @@ class VelocityLimiterImplTest {
         assertEquals(CUSTOMER_ID, result.customerId());
         assertEquals(true, result.accepted());
     }
+
+    @Test
+    void shouldGenerateProperDailyAndWeeklyBoundaries() {
+        // given
+        LoadOrder request = new LoadOrder(LOAD_ID, CUSTOMER_ID, new Amount(CAD, AMOUNT_1000), ZonedDateTime.parse("2026-06-11T01:00:00Z"));
+        LoadEntryAggregate aggregate = new LoadEntryAggregate(BigDecimal.ZERO, 0L);
+        ArgumentCaptor<ZonedDateTime> startDate = ArgumentCaptor.forClass(ZonedDateTime.class);
+        ArgumentCaptor<ZonedDateTime> endDate = ArgumentCaptor.forClass(ZonedDateTime.class);
+
+        BDDMockito.given(loadEntryRepository.existsById(any(LoadEntry.LoadEntryId.class))).willReturn(false);
+        BDDMockito.given(loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(eq(CUSTOMER_ID), startDate.capture(), endDate.capture()))
+                .willReturn(aggregate);
+
+        // when
+        velocityLimiter.attemptLoad(request);
+
+        // then
+        assertEquals(ZonedDateTime.parse("2026-06-11T00:00:00Z"), startDate.getAllValues().get(0));
+        assertEquals(ZonedDateTime.parse("2026-06-12T00:00:00Z"), endDate.getAllValues().get(0));
+        assertEquals(ZonedDateTime.parse("2026-06-08T00:00:00Z"), startDate.getAllValues().get(1));
+        assertEquals(ZonedDateTime.parse("2026-06-15T00:00:00Z"), endDate.getAllValues().get(1));
+    }
+
+    @Test
+    void shouldGenerateProperDailyAndWeeklyBoundariesForNonUTCRequests() {
+        // given
+        LoadOrder request = new LoadOrder(LOAD_ID, CUSTOMER_ID, new Amount(CAD, AMOUNT_1000), ZonedDateTime.parse("2026-06-12T01:00:00+02:00"));
+        LoadEntryAggregate aggregate = new LoadEntryAggregate(BigDecimal.ZERO, 0L);
+        ArgumentCaptor<ZonedDateTime> startDate = ArgumentCaptor.forClass(ZonedDateTime.class);
+        ArgumentCaptor<ZonedDateTime> endDate = ArgumentCaptor.forClass(ZonedDateTime.class);
+
+        BDDMockito.given(loadEntryRepository.existsById(any(LoadEntry.LoadEntryId.class))).willReturn(false);
+        BDDMockito.given(loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(eq(CUSTOMER_ID), startDate.capture(), endDate.capture()))
+                .willReturn(aggregate);
+
+        // when
+        velocityLimiter.attemptLoad(request);
+
+        // then
+        assertEquals(ZonedDateTime.parse("2026-06-11T00:00:00Z"), startDate.getAllValues().get(0));
+        assertEquals(ZonedDateTime.parse("2026-06-12T00:00:00Z"), endDate.getAllValues().get(0));
+        assertEquals(ZonedDateTime.parse("2026-06-08T00:00:00Z"), startDate.getAllValues().get(1));
+        assertEquals(ZonedDateTime.parse("2026-06-15T00:00:00Z"), endDate.getAllValues().get(1));
+    }
+
+    @Test
+    void shouldGenerateProperDailyAndWeeklyBoundariesForNonUTCRequests2() {
+        // given
+        LoadOrder request = new LoadOrder(LOAD_ID, CUSTOMER_ID, new Amount(CAD, AMOUNT_1000), ZonedDateTime.parse("2026-06-10T23:00:00-02:00"));
+        LoadEntryAggregate aggregate = new LoadEntryAggregate(BigDecimal.ZERO, 0L);
+        ArgumentCaptor<ZonedDateTime> startDate = ArgumentCaptor.forClass(ZonedDateTime.class);
+        ArgumentCaptor<ZonedDateTime> endDate = ArgumentCaptor.forClass(ZonedDateTime.class);
+
+        BDDMockito.given(loadEntryRepository.existsById(any(LoadEntry.LoadEntryId.class))).willReturn(false);
+        BDDMockito.given(loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(eq(CUSTOMER_ID), startDate.capture(), endDate.capture()))
+                .willReturn(aggregate);
+
+        // when
+        velocityLimiter.attemptLoad(request);
+
+        // then
+        assertEquals(ZonedDateTime.parse("2026-06-11T00:00:00Z"), startDate.getAllValues().get(0));
+        assertEquals(ZonedDateTime.parse("2026-06-12T00:00:00Z"), endDate.getAllValues().get(0));
+        assertEquals(ZonedDateTime.parse("2026-06-08T00:00:00Z"), startDate.getAllValues().get(1));
+        assertEquals(ZonedDateTime.parse("2026-06-15T00:00:00Z"), endDate.getAllValues().get(1));
+    }
 }

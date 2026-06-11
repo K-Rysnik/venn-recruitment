@@ -1,6 +1,7 @@
 package ca.venn.hometask.service;
 
 import java.math.BigDecimal;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ public class VelocityLimiterImpl implements VelocityLimiter {
     private static final int DAILY_LOAD_COUNT_LIMIT = 3;
     private static final BigDecimal DAILY_LOAD_LIMIT = new BigDecimal("5000");
     private static final BigDecimal WEEKLY_LOAD_LIMIT = new BigDecimal("20000");
+    private static final ZoneId UTC_ZONE = ZoneId.of("UTC").normalized();
 
     @Transactional(isolation = Isolation.SERIALIZABLE)// To avoid phantom reads. Isolation level is only necessary if we allow concurrent load attempts
     @Override
@@ -65,7 +67,7 @@ public class VelocityLimiterImpl implements VelocityLimiter {
     }
 
     private boolean validateDailyLimits(LoadOrder loadOrder, BigDecimal amountInCAD) {
-        ZonedDateTime startOfDay = loadOrder.time().toLocalDate().atStartOfDay(loadOrder.time().getZone());
+        ZonedDateTime startOfDay = loadOrder.time().withZoneSameInstant(UTC_ZONE).toLocalDate().atStartOfDay(UTC_ZONE);
         LoadEntryAggregate aggregate = loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(loadOrder.customerId(), startOfDay, startOfDay.plusDays(1));
         if (aggregate.loadCount() >= DAILY_LOAD_COUNT_LIMIT) {
             log.debug("Customer {} exceeded daily limit of load count. Limit {}, processed loads over the day {}", loadOrder.customerId(), DAILY_LOAD_COUNT_LIMIT, aggregate.loadCount());
@@ -80,7 +82,7 @@ public class VelocityLimiterImpl implements VelocityLimiter {
     }
 
     private boolean validateWeeklyLimits(LoadOrder loadOrder, BigDecimal amountInCAD) {
-        ZonedDateTime startOfWeek = loadOrder.time().toLocalDate().with(java.time.DayOfWeek.MONDAY).atStartOfDay(loadOrder.time().getZone());
+        ZonedDateTime startOfWeek = loadOrder.time().withZoneSameInstant(UTC_ZONE).toLocalDate().with(java.time.DayOfWeek.MONDAY).atStartOfDay(UTC_ZONE);
         LoadEntryAggregate aggregate = loadEntryRepository.getEntryAggregateByCustomerIdAndTimeBetween(loadOrder.customerId(), startOfWeek, startOfWeek.plusWeeks(1));
         if (aggregate.totalAmount().add(amountInCAD).compareTo(WEEKLY_LOAD_LIMIT) > 0) {
             log.debug("Customer {} exceeded weekly limit of loads. Limit {}, loads over the week {}, request {}{} in CAD: {}", loadOrder.customerId(), WEEKLY_LOAD_LIMIT, aggregate.totalAmount(), loadOrder.loadAmount().value(), loadOrder.loadAmount().currency().getCurrencyCode(), amountInCAD);
